@@ -11,7 +11,8 @@ namespace UpSTrayMonitor.Tray;
 public sealed class DetailsForm : Form
 {
     private const int FormWidth = 340;
-    private const int FormHeight = 352;
+    private const int TopBar = 28; // strip above the title row holding the close button
+    private const int FormHeight = 370 + TopBar;
 
     private readonly Label _statusPill;
     private readonly Label _modelLabel;
@@ -19,6 +20,7 @@ public sealed class DetailsForm : Form
     private readonly Label _batteryValue;
     private readonly ProgressBar _batteryBar;
     private readonly Label _inputValue;
+    private readonly Label _batteryVoltValue;
     private readonly Label _loadValue;
     private readonly Label _powerValue;
     private readonly Label _runtimeValue;
@@ -38,23 +40,41 @@ public sealed class DetailsForm : Form
         Font = new Font("Segoe UI", 9.5f);
         Region = new Region(RoundedRectangle(12));
 
-        var title = new Label
+        var closeButton = new Button
         {
-            Text = "UPS Monitor",
-            Font = new Font("Segoe UI", 13.5f, FontStyle.Bold),
-            ForeColor = UpsPresentation.TextPrimary,
-            AutoSize = true,
-            Location = new Point(18, 14),
+            Location = new Point(FormWidth - 34, 2),
+            Size = new Size(24, 24),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = UpsPresentation.TextSecondary,
+            BackColor = UpsPresentation.WindowBackground,
         };
-        Controls.Add(title);
+        closeButton.TabStop = false;
+        closeButton.FlatAppearance.BorderSize = 0;
+        closeButton.FlatAppearance.MouseOverBackColor = UpsPresentation.CardBackground;
+        closeButton.FlatAppearance.MouseDownBackColor = UpsPresentation.CardBackground;
+        closeButton.Click += (_, _) => Hide();
+
+        // Drawn as two lines rather than a "×" glyph, which sits low in the
+        // button box in most fonts.
+        closeButton.Paint += (sender, e) =>
+        {
+            var b = (Button)sender!;
+            const int arm = 5;
+            float cx = (b.Width - 1) / 2f, cy = (b.Height - 1) / 2f;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var pen = new Pen(b.ForeColor, 1.5f);
+            e.Graphics.DrawLine(pen, cx - arm, cy - arm, cx + arm, cy + arm);
+            e.Graphics.DrawLine(pen, cx - arm, cy + arm, cx + arm, cy - arm);
+        };
+        Controls.Add(closeButton);
 
         _modelLabel = new Label
         {
             Text = "USB UPS",
-            Font = new Font("Segoe UI", 9f),
-            ForeColor = UpsPresentation.TextSecondary,
+            Font = new Font("Segoe UI", 13.5f, FontStyle.Bold),
+            ForeColor = UpsPresentation.TextPrimary,
             AutoSize = true,
-            Location = new Point(20, 48),
+            Location = new Point(18, TopBar + 14),
             MaximumSize = new Size(FormWidth - 90, 0),
         };
         Controls.Add(_modelLabel);
@@ -68,33 +88,17 @@ public sealed class DetailsForm : Form
             BackColor = UpsPresentation.Unknown,
             Padding = new Padding(10, 4, 10, 4),
         };
-        _statusPill.Location = new Point(FormWidth - 18 - _statusPill.PreferredWidth, 16);
+        _statusPill.Location = new Point(FormWidth - 18 - _statusPill.PreferredWidth, TopBar + 16);
         Controls.Add(_statusPill);
 
-        var closeButton = new Button
-        {
-            Text = "×",
-            Location = new Point(FormWidth - 34, 42),
-            Size = new Size(24, 24),
-            FlatStyle = FlatStyle.Flat,
-            ForeColor = UpsPresentation.TextSecondary,
-            BackColor = UpsPresentation.WindowBackground,
-            Font = new Font("Segoe UI", 11f),
-        };
-        closeButton.FlatAppearance.BorderSize = 0;
-        closeButton.FlatAppearance.MouseOverBackColor = UpsPresentation.CardBackground;
-        closeButton.FlatAppearance.MouseDownBackColor = UpsPresentation.CardBackground;
-        closeButton.Click += (_, _) => Hide();
-        Controls.Add(closeButton);
+        AddDivider(TopBar + 60);
 
-        AddDivider(80);
-
-        _statusValue = AddRow(98, "Status");
-        _batteryValue = AddRow(132, "Battery level");
+        _statusValue = AddRow(TopBar + 82, "Status");
+        _batteryValue = AddRow(TopBar + 116, "Battery level");
 
         _batteryBar = new ProgressBar
         {
-            Location = new Point(20, 156),
+            Location = new Point(20, TopBar + 140),
             Size = new Size(FormWidth - 40, 10),
             Minimum = 0,
             Maximum = 100,
@@ -105,12 +109,13 @@ public sealed class DetailsForm : Form
         };
         Controls.Add(_batteryBar);
 
-        _inputValue = AddRow(184, "Input voltage");
-        _loadValue = AddRow(218, "Output load");
-        _powerValue = AddRow(252, "Power");
-        _runtimeValue = AddRow(286, "Runtime");
+        _inputValue = AddRow(TopBar + 168, "Input voltage");
+        _batteryVoltValue = AddRow(TopBar + 202, "Battery voltage");
+        _loadValue = AddRow(TopBar + 236, "Output load");
+        _powerValue = AddRow(TopBar + 270, "Power");
+        _runtimeValue = AddRow(TopBar + 304, "Runtime");
 
-        AddDivider(318);
+        AddDivider(TopBar + 336);
 
         _footerSource = new Label
         {
@@ -118,7 +123,7 @@ public sealed class DetailsForm : Form
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = UpsPresentation.TextSecondary,
             AutoSize = true,
-            Location = new Point(20, 328),
+            Location = new Point(20, TopBar + 346),
         };
         Controls.Add(_footerSource);
 
@@ -129,7 +134,7 @@ public sealed class DetailsForm : Form
             ForeColor = UpsPresentation.TextSecondary,
             AutoSize = true,
         };
-        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, 328);
+        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 346);
         Controls.Add(_footerTime);
     }
 
@@ -170,26 +175,27 @@ public sealed class DetailsForm : Form
         }
 
         _inputValue.Text = sample?.InputVoltage is double v ? $"{v:0.#} V" : "—";
+        _batteryVoltValue.Text = sample?.BatteryVoltage is double bv ? $"{bv:0.#} V" : "—";
         _loadValue.Text = sample?.LoadPercent is int load ? $"{load}%" : "—";
         _powerValue.Text = sample?.OutputWatts is double w ? $"{w:0} W" : "—";
         _runtimeValue.Text = sample?.RuntimeMinutes is int minutes ? $"~{minutes} min" : "—";
 
         _footerSource.Text = "Source: " + (sample?.Provider ?? "none");
         string time = sample?.Timestamp is DateTime t && t != default
-            ? "Updated " + t.ToString("HH:mm:ss")
+            ? t.ToString("HH:mm:ss")
             : "Waiting for data…";
         _footerTime.Text = time;
 
         // Re-anchor the right-aligned values AFTER their text changed.
-        int[] rowYs = [98, 132, 184, 218, 252, 286];
-        Label[] rowValues = [_statusValue, _batteryValue, _inputValue, _loadValue, _powerValue, _runtimeValue];
+        int[] rowYs = [TopBar + 82, TopBar + 116, TopBar + 168, TopBar + 202, TopBar + 236, TopBar + 270, TopBar + 304];
+        Label[] rowValues = [_statusValue, _batteryValue, _inputValue, _batteryVoltValue, _loadValue, _powerValue, _runtimeValue];
         for (int i = 0; i < rowValues.Length; i++)
         {
             rowValues[i].Location = new Point(FormWidth - 20 - rowValues[i].PreferredWidth, rowYs[i]);
         }
 
-        _statusPill.Location = new Point(FormWidth - 18 - _statusPill.PreferredWidth, 16);
-        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, 328);
+        _statusPill.Location = new Point(FormWidth - 18 - _statusPill.PreferredWidth, TopBar + 16);
+        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 346);
     }
 
     protected override void OnDeactivate(EventArgs e)

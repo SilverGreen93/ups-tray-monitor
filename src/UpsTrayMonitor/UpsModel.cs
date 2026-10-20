@@ -32,8 +32,14 @@ public sealed record UpsState
     /// <summary>Estimated remaining runtime in minutes, if reported.</summary>
     public int? RuntimeMinutes { get; set; }
 
+    /// <summary>Battery pack voltage in volts, if reported.</summary>
+    public double? BatteryVoltage { get; set; }
+
     /// <summary>UPS model / vendor name, if known.</summary>
     public string? Model { get; set; }
+
+    /// <summary>Extra label/value pairs for the console output (rated power, frequency, ...).</summary>
+    public List<(string Label, string Value)> Details { get; } = new();
 }
 
 /// <summary>A merged sample with bookkeeping info for the UI.</summary>
@@ -45,7 +51,11 @@ public sealed record UpsSample
     public int? LoadPercent { get; init; }
     public double? OutputWatts { get; init; }
     public int? RuntimeMinutes { get; init; }
+    public double? BatteryVoltage { get; init; }
     public string? Model { get; init; }
+
+    /// <summary>Extra label/value pairs reported by the sources, in display order.</summary>
+    public IReadOnlyList<(string Label, string Value)> Details { get; init; } = Array.Empty<(string, string)>();
 
     /// <summary>Names of the data sources that contributed (e.g. "HID + WMI").</summary>
     public string Provider { get; init; } = "none";

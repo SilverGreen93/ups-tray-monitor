@@ -25,6 +25,7 @@ public sealed class UpsMonitor
     public UpsSample GetSample()
     {
         UpsState? best = null;
+        var details = new List<(string Label, string Value)>();
         var usedProviders = new List<string>();
 
         foreach (IUpsProvider provider in _providers)
@@ -45,6 +46,7 @@ public sealed class UpsMonitor
             }
 
             usedProviders.Add(provider.Name);
+            details.AddRange(sample.Details);
 
             if (best == null)
             {
@@ -60,6 +62,7 @@ public sealed class UpsMonitor
                 LoadPercent = best.LoadPercent ?? sample.LoadPercent,
                 OutputWatts = best.OutputWatts ?? sample.OutputWatts,
                 RuntimeMinutes = best.RuntimeMinutes ?? sample.RuntimeMinutes,
+                BatteryVoltage = best.BatteryVoltage ?? sample.BatteryVoltage,
                 Model = best.Model ?? sample.Model,
             };
         }
@@ -74,7 +77,9 @@ public sealed class UpsMonitor
             LoadPercent = best.LoadPercent,
             OutputWatts = best.OutputWatts,
             RuntimeMinutes = best.RuntimeMinutes,
+            BatteryVoltage = best.BatteryVoltage,
             Model = best.Model,
+            Details = details,
             Provider = usedProviders.Count > 0 ? string.Join(" + ", usedProviders) : "none",
             Timestamp = DateTime.Now,
         };

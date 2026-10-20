@@ -147,7 +147,81 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
             any = true;
         }
 
+        AddDetails(state, r, charging, acPresent);
+
         return any ? state : null;
+    }
+
+    /// <summary>Fills the extra console-only values (rated power, frequency, thresholds, ...).</summary>
+    private static void AddDetails(UpsState state, List<FieldReading> r, bool? charging, bool? acPresent)
+    {
+        FieldReading? Find(ushort page, ushort usage, ushort? link = null) =>
+            r.FirstOrDefault(x => x.Field.Page == page && x.Field.Usage == usage && (link == null || x.Field.LinkUsage == link));
+
+        void Add(string label, double? value, string unit, string format = "0.#")
+        {
+            if (value != null)
+            {
+                state.Details.Add((label, value.Value.ToString(format) + " " + unit));
+            }
+        }
+
+        // Output side
+        double? outV = Find(Usages.PowerPage, Usages.Voltage, Usages.OutputCollection)?.Value;
+        Add("Out volt", outV, "V");
+        Add("Out freq", Find(Usages.PowerPage, Usages.Frequency, Usages.OutputCollection)?.Value, "Hz");
+
+        double? outA = Find(Usages.PowerPage, Usages.Current, Usages.OutputCollection)?.Value;
+        if (outA != null)
+        {
+            Add("Current", outA, "A", "0.00");
+        }
+        else if (state.OutputWatts is > 0 && outV is > 0)
+        {
+            // The UPS does not report current; derive it from power and voltage.
+            state.Details.Add(("Current", $"~{state.OutputWatts.Value / outV.Value:0.00} A (estimated)"));
+        }
+
+        Add("Rated W", Find(Usages.PowerPage, Usages.ConfigActivePower)?.Value, "W", "0");
+        Add("Rated VA", Find(Usages.PowerPage, Usages.ConfigApparentPower)?.Value, "VA", "0");
+        Add("App.pwr", Find(Usages.PowerPage, Usages.ApparentPower)?.Value, "VA", "0");
+
+        // Input side
+        Add("In freq", Find(Usages.PowerPage, Usages.Frequency, Usages.InputCollection)?.Value, "Hz");
+        Add("Nom. in", Find(Usages.PowerPage, Usages.ConfigVoltage, Usages.InputCollection)?.Value, "V", "0");
+
+        double? low = Find(Usages.PowerPage, Usages.LowVoltageTransfer)?.Value;
+        double? high = Find(Usages.PowerPage, Usages.HighVoltageTransfer)?.Value;
+        if (low != null && high != null)
+        {
+            state.Details.Add(("Transfer", $"{low:0} V - {high:0} V (switches to battery outside this range)"));
+        }
+
+        // Battery side: values in the PowerSummary collection.
+        bool IsBatteryLink(FieldReading x) => x.Field.LinkUsage == Usages.PowerSummaryCollection;
+        double? batV = r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.Voltage && IsBatteryLink(x))?.Value;
+        double? batNom = r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.ConfigVoltage && IsBatteryLink(x))?.Value;
+        if (batV != null)
+        {
+            state.BatteryVoltage = batV;
+            state.Details.Add(("Bat volt", batNom != null ? $"{batV:0.#} V (nominal {batNom:0} V)" : $"{batV:0.#} V"));
+        }
+
+        if (charging != null || acPresent != null)
+        {
+            string text = charging == true ? "charging" : "not charging";
+            if (acPresent != null)
+            {
+                text += acPresent == true ? ", AC present" : ", AC lost";
+            }
+
+            state.Details.Add(("Charger", text));
+        }
+
+        if (Find(Usages.BatteryPage, Usages.NeedReplacement)?.Flag == true)
+        {
+            state.Details.Add(("Warning", "battery needs replacement"));
+        }
     }
 
     // ------------------------------------------------------------ diagnostics
@@ -261,11 +335,18 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
         // Power Device page (0x84)
         public const ushort InputCollection = 0x1A;
         public const ushort OutputCollection = 0x1C;
+        public const ushort PowerSummaryCollection = 0x24; // battery-side values
         public const ushort Voltage = 0x30;
+        public const ushort Current = 0x31;
+        public const ushort Frequency = 0x32;
         public const ushort ApparentPower = 0x33;
         public const ushort ActivePower = 0x34;
         public const ushort PercentLoad = 0x35;
+        public const ushort ConfigVoltage = 0x40;
+        public const ushort ConfigApparentPower = 0x43;
         public const ushort ConfigActivePower = 0x44;
+        public const ushort LowVoltageTransfer = 0x53;
+        public const ushort HighVoltageTransfer = 0x54;
         public const ushort ShutdownImminent = 0x69;
 
         // Battery System page (0x85)
@@ -282,22 +363,25 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
 
         public static string? Name(ushort page, ushort usage) => (page, usage) switch
         {
-            (PowerPage, 0x04) => "PowerSummary",
+            (PowerPage, 0x04) => "UPS",
+            (PowerPage, PowerSummaryCollection) => "PowerSummary",
             (PowerPage, 0x02) => "PresentStatus",
             (PowerPage, InputCollection) => "Input",
             (PowerPage, OutputCollection) => "Output",
             (PowerPage, 0x1E) => "Flow",
             (PowerPage, 0x16) => "PowerConverter",
             (PowerPage, Voltage) => "Voltage",
-            (PowerPage, 0x31) => "Current",
-            (PowerPage, 0x32) => "Frequency",
+            (PowerPage, Current) => "Current",
+            (PowerPage, Frequency) => "Frequency",
             (PowerPage, ApparentPower) => "ApparentPower",
             (PowerPage, ActivePower) => "ActivePower",
             (PowerPage, PercentLoad) => "PercentLoad",
             (PowerPage, 0x36) => "Temperature",
-            (PowerPage, 0x40) => "ConfigVoltage",
+            (PowerPage, ConfigVoltage) => "ConfigVoltage",
             (PowerPage, 0x42) => "ConfigFrequency",
-            (PowerPage, 0x43) => "ConfigApparentPower",
+            (PowerPage, ConfigApparentPower) => "ConfigApparentPower",
+            (PowerPage, LowVoltageTransfer) => "LowVoltageTransfer",
+            (PowerPage, HighVoltageTransfer) => "HighVoltageTransfer",
             (PowerPage, ConfigActivePower) => "ConfigActivePower",
             (PowerPage, ShutdownImminent) => "ShutdownImminent",
             (BatteryPage, BelowRemainingCapacityLimit) => "BelowRemainingCapacityLimit",
@@ -607,6 +691,11 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
             if (isVoltsOrWatts && f.UnitsExp is >= 1 and <= 7)
             {
                 return raw * Math.Pow(10, f.UnitsExp - 7);
+            }
+
+            if ((f.Units & 0xFFFF) == 0xF001)
+            {
+                return raw * Math.Pow(10, f.UnitsExp); // Hertz
             }
 
             return raw;

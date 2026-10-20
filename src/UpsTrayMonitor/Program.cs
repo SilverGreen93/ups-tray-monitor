@@ -161,6 +161,7 @@ internal static class Program
             LoadPercent = 23,
             OutputWatts = 184,
             RuntimeMinutes = 96,
+            BatteryVoltage = 25.4,
             Model = "Test UPS 1500VA",
             Provider = "HID (sample data)",
             Timestamp = DateTime.Now,
@@ -193,6 +194,7 @@ internal static class Program
             LoadPercent = 23,
             OutputWatts = 184,
             RuntimeMinutes = 142,
+            BatteryVoltage = 27.1,
             Model = "Test UPS 1500VA",
             Provider = "HID (sample data)",
             Timestamp = DateTime.Now,
@@ -264,6 +266,11 @@ internal static class Program
         Console.WriteLine($"  Power   : {(sample.OutputWatts is double w ? w.ToString("0") + " W" : "n/a")}");
         Console.WriteLine($"  Runtime : {(sample.RuntimeMinutes is int m ? "~" + m + " min" : "n/a")}");
         Console.WriteLine($"  Model   : {sample.Model ?? "n/a"}");
+        foreach (var (label, value) in sample.Details)
+        {
+            Console.WriteLine($"  {label,-8}: {value}");
+        }
+
         Console.WriteLine($"  Source  : {sample.Provider}");
     }
 

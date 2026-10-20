@@ -34,7 +34,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
                 return null;
             }
 
-            List<FieldReading>? readings = _device.ReadAll();
+            List<FieldReading>? readings = ReadStable(_device);
             if (readings == null)
             {
                 // Device unplugged or stopped answering: re-enumerate next poll.
@@ -52,6 +52,58 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
     }
 
     public void Dispose() => Release();
+
+    // CyberPower firmware intermittently answers the load query with a bogus 0
+    // (about 1 read in 6), which also zeroes the derived power. Re-read a few
+    // times, and if it still says 0 keep the previous value for a short while;
+    // a load that really is 0 is accepted after a few consecutive zeros.
+    private const int LoadRetries = 3;
+    private const int MaxHeldZeroPolls = 2;
+    private double _lastLoad;
+    private int _zeroLoadPolls;
+
+    private List<FieldReading>? ReadStable(UpsHidDevice device)
+    {
+        List<FieldReading>? readings = null;
+        FieldReading? load = null;
+        for (int attempt = 0; attempt < LoadRetries; attempt++)
+        {
+            readings = device.ReadAll();
+            if (readings == null)
+            {
+                return null;
+            }
+
+            load = readings.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.PercentLoad);
+            if (load == null || load.Raw != 0)
+            {
+                break;
+            }
+
+            Thread.Sleep(150);
+        }
+
+        if (load == null || readings == null)
+        {
+            return readings;
+        }
+
+        if (load.Raw != 0)
+        {
+            _lastLoad = load.Value;
+            _zeroLoadPolls = 0;
+        }
+        else if (_lastLoad > 0 && ++_zeroLoadPolls <= MaxHeldZeroPolls)
+        {
+            readings[readings.IndexOf(load)] = load with { Raw = (long)_lastLoad, Value = _lastLoad };
+        }
+        else
+        {
+            _lastLoad = 0;
+        }
+
+        return readings;
+    }
 
     private void Release()
     {

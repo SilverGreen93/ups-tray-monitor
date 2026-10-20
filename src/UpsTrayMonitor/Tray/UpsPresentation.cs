@@ -71,6 +71,11 @@ public static class UpsPresentation
             lines.Add($"Input: {sample.InputVoltage:0.#} V");
         }
 
+        if (sample.BatteryVoltage != null)
+        {
+            lines.Add($"Battery: {sample.BatteryVoltage:0.#} V");
+        }
+
         if (sample.LoadPercent != null)
         {
             lines.Add($"Load: {sample.LoadPercent}%");

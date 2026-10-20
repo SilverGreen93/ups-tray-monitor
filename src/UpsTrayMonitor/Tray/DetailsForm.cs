@@ -12,11 +12,10 @@ public sealed class DetailsForm : Form
 {
     private const int FormWidth = 340;
     private const int TopBar = 28; // strip above the title row holding the close button
-    private const int FormHeight = 370 + TopBar;
+    private const int FormHeight = 336 + TopBar;
 
     private readonly Label _statusPill;
     private readonly Label _modelLabel;
-    private readonly Label _statusValue;
     private readonly Label _batteryValue;
     private readonly ProgressBar _batteryBar;
     private readonly Label _inputValue;
@@ -93,12 +92,11 @@ public sealed class DetailsForm : Form
 
         AddDivider(TopBar + 60);
 
-        _statusValue = AddRow(TopBar + 82, "Status");
-        _batteryValue = AddRow(TopBar + 116, "Battery level");
+        _batteryValue = AddRow(TopBar + 82, "Battery level");
 
         _batteryBar = new ProgressBar
         {
-            Location = new Point(20, TopBar + 140),
+            Location = new Point(20, TopBar + 106),
             Size = new Size(FormWidth - 40, 10),
             Minimum = 0,
             Maximum = 100,
@@ -109,13 +107,13 @@ public sealed class DetailsForm : Form
         };
         Controls.Add(_batteryBar);
 
-        _inputValue = AddRow(TopBar + 168, "Input voltage");
-        _batteryVoltValue = AddRow(TopBar + 202, "Battery voltage");
-        _loadValue = AddRow(TopBar + 236, "Output load");
-        _powerValue = AddRow(TopBar + 270, "Power");
-        _runtimeValue = AddRow(TopBar + 304, "Runtime");
+        _inputValue = AddRow(TopBar + 134, "Input voltage");
+        _batteryVoltValue = AddRow(TopBar + 168, "Battery voltage");
+        _loadValue = AddRow(TopBar + 202, "Output load");
+        _powerValue = AddRow(TopBar + 236, "Power");
+        _runtimeValue = AddRow(TopBar + 270, "Runtime");
 
-        AddDivider(TopBar + 336);
+        AddDivider(TopBar + 302);
 
         _footerSource = new Label
         {
@@ -123,7 +121,7 @@ public sealed class DetailsForm : Form
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = UpsPresentation.TextSecondary,
             AutoSize = true,
-            Location = new Point(20, TopBar + 346),
+            Location = new Point(20, TopBar + 312),
         };
         Controls.Add(_footerSource);
 
@@ -134,7 +132,7 @@ public sealed class DetailsForm : Form
             ForeColor = UpsPresentation.TextSecondary,
             AutoSize = true,
         };
-        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 346);
+        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 312);
         Controls.Add(_footerTime);
     }
 
@@ -158,8 +156,6 @@ public sealed class DetailsForm : Form
 
         _modelLabel.Text = sample?.Model ?? "USB UPS";
 
-        _statusValue.Text = hasData ? UpsPresentation.StatusText(sample) : "No data detected";
-        _statusValue.ForeColor = color;
 
         if (sample?.BatteryPercent is int percent)
         {
@@ -187,15 +183,15 @@ public sealed class DetailsForm : Form
         _footerTime.Text = time;
 
         // Re-anchor the right-aligned values AFTER their text changed.
-        int[] rowYs = [TopBar + 82, TopBar + 116, TopBar + 168, TopBar + 202, TopBar + 236, TopBar + 270, TopBar + 304];
-        Label[] rowValues = [_statusValue, _batteryValue, _inputValue, _batteryVoltValue, _loadValue, _powerValue, _runtimeValue];
+        int[] rowYs = [TopBar + 82, TopBar + 134, TopBar + 168, TopBar + 202, TopBar + 236, TopBar + 270];
+        Label[] rowValues = [_batteryValue, _inputValue, _batteryVoltValue, _loadValue, _powerValue, _runtimeValue];
         for (int i = 0; i < rowValues.Length; i++)
         {
             rowValues[i].Location = new Point(FormWidth - 20 - rowValues[i].PreferredWidth, rowYs[i]);
         }
 
         _statusPill.Location = new Point(FormWidth - 18 - _statusPill.PreferredWidth, TopBar + 16);
-        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 346);
+        _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 312);
     }
 
     protected override void OnDeactivate(EventArgs e)

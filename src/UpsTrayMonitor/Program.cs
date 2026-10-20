@@ -11,6 +11,13 @@ internal static class Program
     {
         string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "tray";
 
+        // The exe is a WinExe (no console of its own), so the command-line modes
+        // have to attach to the parent console before they can print anything.
+        if (mode is "--once" or "--console" or "--dump" or "--help" or "-h")
+        {
+            ConsoleAttach.Attach();
+        }
+
         switch (mode)
         {
             case "--once":

@@ -36,17 +36,19 @@ public sealed class TrayApplicationContext : ApplicationContext
         };
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Show details", null, (_, _) => ToggleDetails());
+        menu.Items.Add("Show details", null, (_, _) => _detailsForm.HandleTrayIconClick(_lastSample));
         menu.Items.Add("Refresh now", null, (_, _) => _refreshRequested = true);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApplication());
         _notifyIcon.ContextMenuStrip = menu;
 
+        // Single left-click toggles the popup: visible → hide, hidden → show.
+        // DetailsForm does NOT auto-hide on losing focus, so this is a simple, race-free toggle.
         _notifyIcon.MouseClick += (_, e) =>
         {
             if (e.Button == MouseButtons.Left)
             {
-                ToggleDetails();
+                _detailsForm.HandleTrayIconClick(_lastSample);
             }
         };
 
@@ -151,19 +153,6 @@ public sealed class TrayApplicationContext : ApplicationContext
             {
                 _detailsForm.Update(sample);
             }
-        }
-    }
-
-    private void ToggleDetails()
-    {
-        if (_detailsForm.Visible)
-        {
-            _detailsForm.Hide();
-        }
-        else
-        {
-            _detailsForm.Update(_lastSample);
-            _detailsForm.ShowNearTray();
         }
     }
 

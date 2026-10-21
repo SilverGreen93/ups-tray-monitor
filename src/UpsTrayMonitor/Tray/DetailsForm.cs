@@ -6,7 +6,7 @@ namespace UpSTrayMonitor.Tray;
 /// <summary>
 /// Borderless popup shown when the tray icon is clicked.
 /// Displays the same data as the hover tooltip, in more detail.
-/// Hides itself when it loses activation (typical popup behavior).
+/// Toggled by a single click on the tray icon; closed via the tray icon or the X button.
 /// </summary>
 public sealed class DetailsForm : Form
 {
@@ -25,6 +25,34 @@ public sealed class DetailsForm : Form
     private readonly Label _runtimeValue;
     private readonly Label _footerSource;
     private readonly Label _footerTime;
+
+    private bool _isOpen;
+
+    /// <summary>True while the popup is actually on screen (i.e. <see cref="Form.Visible"/> is true).</summary>
+    public bool IsOpen => _isOpen;
+
+    /// <summary>
+    /// Toggles the popup in response to a tray-icon click (or the "Show details" menu item).
+    /// Visible → hide; hidden → show.
+    ///
+    /// We intentionally do NOT auto-hide on OnDeactivate. Clicking the tray icon deactivates
+    /// the popup (firing OnDeactivate) BEFORE NotifyIcon.MouseClick fires, so a hide-on-
+    /// deactivation would race with the toggle and make single-click unreliable (the click
+    /// that should hide would instead re-show). Keeping the popup open until it's explicitly
+    /// closed (tray click or X) makes the toggle a simple, correct visibility check.
+    /// </summary>
+    public void HandleTrayIconClick(UpsSample? sample)
+    {
+        if (IsOpen)
+        {
+            Hide();
+        }
+        else
+        {
+            Update(sample);
+            ShowNearTray();
+        }
+    }
 
     public DetailsForm()
     {
@@ -194,10 +222,15 @@ public sealed class DetailsForm : Form
         _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 312);
     }
 
-    protected override void OnDeactivate(EventArgs e)
+    // Note: we deliberately do NOT auto-hide on OnDeactivate. The popup stays open until
+    // the user explicitly closes it (tray-icon click or the X button). This avoids the
+    // WinForms race where clicking the tray icon deactivates the popup *before* the
+    // MouseClick event fires, which made single-click toggle impossible.
+
+    protected override void OnVisibleChanged(EventArgs e)
     {
-        base.OnDeactivate(e);
-        Hide();
+        base.OnVisibleChanged(e);
+        _isOpen = Visible;
     }
 
     // ------------------------------------------------------------------ layout helpers

@@ -113,6 +113,59 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
 
     // -------------------------------------------------------------- mapping
 
+    private static bool IsBatteryLink(HidField f) =>
+        f.LinkUsage is Usages.PowerSummaryCollection or Usages.BatteryCollection;
+
+    /// <summary>
+    /// Some firmwares (cheap Cypress-based units) declare a wrong unit exponent in
+    /// the report descriptor, so voltages/frequencies come out 10-1000x off. There
+    /// is no flag for that, so every non-zero voltage/frequency is sanity-checked
+    /// against the range it must be in (using the nominal value when the unit
+    /// reports one) and, if implausible, re-scaled by a power of ten until it fits.
+    /// </summary>
+    private static void NormalizeScales(List<FieldReading> r)
+    {
+        double? Nominal(ushort usage, Func<HidField, bool> link) =>
+            r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == usage
+                                  && link(x.Field) && x.Value > 0)?.Value;
+
+        double? batNominal = Nominal(Usages.ConfigVoltage, IsBatteryLink);
+        double? freqNominal = Nominal(Usages.ConfigFrequency, _ => true);
+
+        for (int i = 0; i < r.Count; i++)
+        {
+            FieldReading x = r[i];
+            if (x.Field.IsButton || x.Field.Page != Usages.PowerPage || x.Raw == 0)
+            {
+                continue;
+            }
+
+            (double Min, double Max)? range = x.Field.Usage switch
+            {
+                Usages.Voltage or Usages.LowVoltageTransfer or Usages.HighVoltageTransfer
+                    when IsBatteryLink(x.Field) => batNominal is double n ? (n * 0.3, n * 1.8) : (1, 150),
+                Usages.Voltage or Usages.LowVoltageTransfer or Usages.HighVoltageTransfer => (50, 330),
+                Usages.Frequency => freqNominal is double f ? (f * 0.8, f * 1.2) : (40, 70),
+                _ => null,
+            };
+
+            if (range is not var (min, max) || (x.Value >= min && x.Value <= max))
+            {
+                continue;
+            }
+
+            foreach (double divisor in new[] { 10.0, 1.0, 100.0, 1000.0 })
+            {
+                double candidate = x.Raw / divisor;
+                if (candidate >= min && candidate <= max)
+                {
+                    r[i] = x with { Value = candidate };
+                    break;
+                }
+            }
+        }
+    }
+
     private static UpsState? Map(List<FieldReading> r, string? model)
     {
         var state = new UpsState { Model = model };
@@ -163,7 +216,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
         // ---- electrical
         var vin = Find(Usages.PowerPage, Usages.Voltage, Usages.InputCollection)
                   ?? r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.Voltage
-                                           && x.Field.LinkUsage != Usages.OutputCollection);
+                                           && x.Field.LinkUsage != Usages.OutputCollection && !IsBatteryLink(x.Field));
         if (vin != null)
         {
             state.InputVoltage = vin.Value;
@@ -188,14 +241,26 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
             }
         }
 
+        // No real watts available: deduce the apparent power (VA) instead.
+        double? va = null;
         if (watts is null or 0)
         {
-            watts = Find(Usages.PowerPage, Usages.ApparentPower)?.Value ?? watts;
+            va = Find(Usages.PowerPage, Usages.ApparentPower)?.Value;
+            var ratedVa = Find(Usages.PowerPage, Usages.ConfigApparentPower);
+            if (va is null or 0 && load != null && ratedVa != null && ratedVa.Value > 0)
+            {
+                va = ratedVa.Value * load.Value / 100.0;
+            }
         }
 
-        if (watts != null)
+        if (watts is > 0 || (watts != null && va is not > 0))
         {
             state.OutputWatts = watts;
+            any = true;
+        }
+        else if (va != null)
+        {
+            state.OutputVa = va;
             any = true;
         }
 
@@ -228,10 +293,10 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
         {
             Add("Current", outA, "A", "0.00");
         }
-        else if (state.OutputWatts is > 0 && outV is > 0)
+        else if ((state.OutputWatts ?? state.OutputVa) is > 0 and double power && outV is > 0)
         {
             // The UPS does not report current; derive it from power and voltage.
-            state.Details.Add(("Current", $"~{state.OutputWatts.Value / outV.Value:0.00} A (estimated)"));
+            state.Details.Add(("Current", $"~{power / outV.Value:0.00} A (estimated)"));
         }
 
         Add("Rated W", Find(Usages.PowerPage, Usages.ConfigActivePower)?.Value, "W", "0");
@@ -240,7 +305,11 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
 
         // Input side
         Add("In freq", Find(Usages.PowerPage, Usages.Frequency, Usages.InputCollection)?.Value, "Hz");
-        Add("Nom. in", Find(Usages.PowerPage, Usages.ConfigVoltage, Usages.InputCollection)?.Value, "V", "0");
+        double? nomIn = Find(Usages.PowerPage, Usages.ConfigVoltage, Usages.InputCollection)?.Value;
+        if (nomIn is >= 50 and <= 330) // some firmwares put the battery nominal here
+        {
+            Add("Nom. in", nomIn, "V", "0");
+        }
 
         double? low = Find(Usages.PowerPage, Usages.LowVoltageTransfer)?.Value;
         double? high = Find(Usages.PowerPage, Usages.HighVoltageTransfer)?.Value;
@@ -250,9 +319,8 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
         }
 
         // Battery side: values in the PowerSummary collection.
-        bool IsBatteryLink(FieldReading x) => x.Field.LinkUsage == Usages.PowerSummaryCollection;
-        double? batV = r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.Voltage && IsBatteryLink(x))?.Value;
-        double? batNom = r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.ConfigVoltage && IsBatteryLink(x))?.Value;
+        double? batV = r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.Voltage && IsBatteryLink(x.Field))?.Value;
+        double? batNom = r.FirstOrDefault(x => x.Field.Page == Usages.PowerPage && x.Field.Usage == Usages.ConfigVoltage && IsBatteryLink(x.Field))?.Value;
         if (batV != null)
         {
             state.BatteryVoltage = batV;
@@ -388,6 +456,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
         public const ushort InputCollection = 0x1A;
         public const ushort OutputCollection = 0x1C;
         public const ushort PowerSummaryCollection = 0x24; // battery-side values
+        public const ushort BatteryCollection = 0x12;      // battery-side values (other firmwares)
         public const ushort Voltage = 0x30;
         public const ushort Current = 0x31;
         public const ushort Frequency = 0x32;
@@ -395,6 +464,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
         public const ushort ActivePower = 0x34;
         public const ushort PercentLoad = 0x35;
         public const ushort ConfigVoltage = 0x40;
+        public const ushort ConfigFrequency = 0x42;
         public const ushort ConfigApparentPower = 0x43;
         public const ushort ConfigActivePower = 0x44;
         public const ushort LowVoltageTransfer = 0x53;
@@ -422,6 +492,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
             (PowerPage, OutputCollection) => "Output",
             (PowerPage, 0x1E) => "Flow",
             (PowerPage, 0x16) => "PowerConverter",
+            (PowerPage, BatteryCollection) => "Battery",
             (PowerPage, Voltage) => "Voltage",
             (PowerPage, Current) => "Current",
             (PowerPage, Frequency) => "Frequency",
@@ -430,7 +501,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
             (PowerPage, PercentLoad) => "PercentLoad",
             (PowerPage, 0x36) => "Temperature",
             (PowerPage, ConfigVoltage) => "ConfigVoltage",
-            (PowerPage, 0x42) => "ConfigFrequency",
+            (PowerPage, ConfigFrequency) => "ConfigFrequency",
             (PowerPage, ConfigApparentPower) => "ConfigApparentPower",
             (PowerPage, LowVoltageTransfer) => "LowVoltageTransfer",
             (PowerPage, HighVoltageTransfer) => "HighVoltageTransfer",
@@ -714,7 +785,13 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
                 }
             }
 
-            return result.Count > 0 ? result : null;
+            if (result.Count == 0)
+            {
+                return null;
+            }
+
+            NormalizeScales(result);
+            return result;
         }
 
         private byte[]? FetchReport(int reportType, byte reportId)

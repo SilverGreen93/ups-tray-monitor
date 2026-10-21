@@ -81,9 +81,9 @@ public static class UpsPresentation
             lines.Add($"Load: {sample.LoadPercent}%");
         }
 
-        if (sample.OutputWatts != null)
+        if (sample.PowerText() is string power)
         {
-            lines.Add($"Power: {sample.OutputWatts:0} W");
+            lines.Add($"Power: {power}");
         }
 
         if (sample.RuntimeMinutes != null)
@@ -99,11 +99,18 @@ public static class UpsPresentation
 /// <summary>Extension helpers for samples.</summary>
 public static class SampleExtensions
 {
+    /// <summary>Output power as "N W", or "N VA" when only apparent power is known.</summary>
+    public static string? PowerText(this UpsSample sample) =>
+        sample.OutputWatts is double w ? $"{w:0} W"
+        : sample.OutputVa is double va ? $"{va:0} VA"
+        : null;
+
     public static bool HasData(this UpsSample sample) =>
         sample.Status != UpsStatus.Unknown
         || sample.BatteryPercent != null
         || sample.InputVoltage != null
         || sample.LoadPercent != null
         || sample.OutputWatts != null
+        || sample.OutputVa != null
         || sample.RuntimeMinutes != null;
 }

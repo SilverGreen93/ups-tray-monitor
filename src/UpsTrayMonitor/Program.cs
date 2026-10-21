@@ -263,7 +263,7 @@ internal static class Program
         Console.WriteLine($"  Battery : {(sample.BatteryPercent is int b ? b + "%" : "n/a")}");
         Console.WriteLine($"  Input   : {(sample.InputVoltage is double v ? v.ToString("0.#") + " V" : "n/a")}");
         Console.WriteLine($"  Load    : {(sample.LoadPercent is int l ? l + "%" : "n/a")}");
-        Console.WriteLine($"  Power   : {(sample.OutputWatts is double w ? w.ToString("0") + " W" : "n/a")}");
+        Console.WriteLine($"  Power   : {sample.PowerText() ?? "n/a"}");
         Console.WriteLine($"  Runtime : {(sample.RuntimeMinutes is int m ? "~" + m + " min" : "n/a")}");
         Console.WriteLine($"  Model   : {sample.Model ?? "n/a"}");
         foreach (var (label, value) in sample.Details)

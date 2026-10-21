@@ -213,7 +213,7 @@ public sealed class DetailsForm : Form
         _inputValue.Text = sample?.InputVoltage is double v ? $"{v:0.#} V" : "—";
         _batteryVoltValue.Text = sample?.BatteryVoltage is double bv ? $"{bv:0.#} V" : "—";
         _loadValue.Text = sample?.LoadPercent is int load ? $"{load}%" : "—";
-        _powerValue.Text = sample?.OutputWatts is double w ? $"{w:0} W" : "—";
+        _powerValue.Text = sample?.PowerText() ?? "—";
         _runtimeValue.Text = sample?.RuntimeMinutes is int minutes ? $"~{minutes} min" : "—";
 
         _footerSource.Text = "Source: " + (sample?.Provider ?? "none");

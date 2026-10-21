@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Description>Windows system tray monitor for USB UPS status (battery level, voltage, load).</Description>
   </PropertyGroup>
 

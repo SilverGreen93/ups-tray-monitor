@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Reflection;
 
 namespace UpSTrayMonitor.Tray;
 
@@ -94,6 +95,17 @@ public sealed class DetailsForm : Form
             e.Graphics.DrawLine(pen, cx - arm, cy + arm, cx + arm, cy - arm);
         };
         Controls.Add(closeButton);
+
+        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+        var titleLabel = new Label
+        {
+            Text = string.IsNullOrEmpty(version) ? "UPS Tray Monitor" : $"UPS Tray Monitor v{version}",
+            Font = new Font("Segoe UI", 9.5f),
+            ForeColor = UpsPresentation.TextSecondary,
+            AutoSize = true,
+            Location = new Point(14, 7),
+        };
+        Controls.Add(titleLabel);
 
         _modelLabel = new Label
         {

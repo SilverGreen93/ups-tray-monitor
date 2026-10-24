@@ -14,6 +14,7 @@ public sealed class UpsMonitor
         _providers = new List<IUpsProvider>
         {
             new HidUpsProvider(),
+            new MegatecHidProvider(),
             new WmiUpsProvider(),
             new SystemPowerProvider(),
         };
@@ -46,7 +47,7 @@ public sealed class UpsMonitor
             }
 
             usedProviders.Add(provider.Name);
-            details.AddRange(sample.Details);
+            details.AddRange(sample.Details.Where(d => !details.Any(x => x.Label == d.Label)));
 
             if (best == null)
             {

@@ -404,7 +404,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
                 foreach (HidField f in dev.Fields)
                 {
                     FieldReading? rd = readings.FirstOrDefault(x => x.Field == f);
-                    string val = rd == null ? "(read failed)"
+                    string val = rd == null ? "(not available)"
                         : f.IsButton ? (rd.Flag == true ? "ON" : "off")
                         : rd.Raw == rd.Value ? rd.Raw.ToString() : $"{rd.Raw} -> {rd.Value:0.##}";
                     Console.WriteLine($"      {Describe(f),-62} = {val}");
@@ -772,7 +772,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
                 else
                 {
                     int status = Native.HidP_GetUsageValue(f.ReportType, f.Page, f.Link, f.Usage, out uint raw, _preparsed, report, (uint)report.Length);
-                    if (status == Native.HidpSuccess)
+                    if (status == Native.HidpSuccess && !IsPlaceholder(f, raw))
                     {
                         long value = raw;
                         if (f.LogicalMin < 0 && f.BitSize is > 0 and < 32 && (raw & (1u << (f.BitSize - 1))) != 0)
@@ -792,6 +792,24 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
 
             NormalizeScales(result);
             return result;
+        }
+
+        /// <summary>
+        /// Some firmwares declare far more fields than they implement and answer the
+        /// rest with filler instead of an error: all bits set ("not available"), or
+        /// 0xFF followed by the report id echoed back (e.g. id 0x20 reads 0x20FF).
+        /// Such values must not be shown as measurements.
+        /// </summary>
+        private static bool IsPlaceholder(HidField f, uint raw)
+        {
+            if (f.BitSize is > 1 and <= 16 && f.LogicalMin >= 0 && raw == (1u << f.BitSize) - 1)
+            {
+                return true;
+            }
+
+            // 0xFF in a wider field is the same filler (id byte missing or zero).
+            return f.ReportType == Native.HidpFeature && f.BitSize >= 8
+                   && ((raw & 0xFF) == 0xFF && (raw >> 8) is var hi && (hi == f.ReportId || hi == 0));
         }
 
         private byte[]? FetchReport(int reportType, byte reportId)
@@ -848,7 +866,7 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
 
     // ------------------------------------------------------------------ P/Invoke
 
-    private static class Native
+    internal static class Native
     {
         public static readonly IntPtr InvalidHandle = new(-1);
 

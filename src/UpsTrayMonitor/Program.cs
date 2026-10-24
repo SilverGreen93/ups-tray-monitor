@@ -28,6 +28,7 @@ internal static class Program
 
             case "--dump":
                 HidUpsProvider.Dump();
+                MegatecHidProvider.Dump();
                 return 0;
 
             case "--screenshot":

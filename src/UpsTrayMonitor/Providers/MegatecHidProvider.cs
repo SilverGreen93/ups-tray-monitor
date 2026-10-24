@@ -23,6 +23,9 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
 
     private const ushort VendorPage = 0xFF00;
     private const int ChunkSize = 8;
+
+    // Q1 is the usual status command; some units (Voltronic "QS" firmwares) only echo it and answer QS.
+    private static readonly string[] Commands = { "Q1", "QS" };
     private const int ReplyTimeoutMs = 2000;
 
     private Channel? _channel;
@@ -38,7 +41,7 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
                 return null;
             }
 
-            string? reply = _channel.Query("Q1");
+            string? reply = _channel.Query(_channel.Command);
             if (reply == null || !TryParse(reply, out UpsState? state))
             {
                 // Unplugged or stopped answering: re-detect next poll.
@@ -136,11 +139,15 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
             }
 
             Channel? channel = Channel.Open(path, i);
-            string? reply = channel?.Query("Q1");
-            log.Add($"{path}: " + (reply == null ? "no reply" : $"\"{reply}\""));
-            if (channel != null && reply != null && TryParse(reply, out _))
+            foreach (string command in Commands)
             {
-                return channel;
+                string? reply = channel?.Query(command);
+                log.Add($"{path} [{command}]: " + (reply == null ? "no reply" : $"\"{reply}\""));
+                if (channel != null && reply != null && TryParse(reply, out _))
+                {
+                    channel.Command = command;
+                    return channel;
+                }
             }
 
             channel?.Dispose();
@@ -200,6 +207,9 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
         private readonly FileStream _stream;
         private readonly int _reportLength;
 
+        /// <summary>The status command this unit answers.</summary>
+        public string Command { get; set; } = "Q1";
+
         private Channel(FileStream stream, int reportLength)
         {
             _stream = stream;
@@ -251,6 +261,13 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
                 {
                     if (b == '\r')
                     {
+                        // Some firmwares echo the command before the real reply.
+                        if (reply.Length == 0 || reply.ToString() == command)
+                        {
+                            reply.Clear();
+                            continue;
+                        }
+
                         return reply.ToString();
                     }
 
@@ -262,6 +279,32 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
             }
 
             return null;
+        }
+
+        /// <summary>Sends a command and appends every report received within 1.5 s as hex and ASCII.</summary>
+        public void Raw(string command, StringBuilder output)
+        {
+            while (ReadReport(50) != null)
+            {
+            }
+
+            byte[] bytes = Encoding.ASCII.GetBytes(command + "\r");
+            var report = new byte[_reportLength];
+            Array.Copy(bytes, 0, report, 1, bytes.Length);
+            _stream.Write(report, 0, report.Length);
+
+            DateTime deadline = DateTime.UtcNow.AddMilliseconds(1500);
+            while (DateTime.UtcNow < deadline)
+            {
+                byte[]? r = ReadReport(Math.Max(1, (int)(deadline - DateTime.UtcNow).TotalMilliseconds));
+                if (r == null)
+                {
+                    break;
+                }
+
+                string ascii = new(r.Skip(1).Select(b => b is >= 32 and < 127 ? (char)b : '.').ToArray());
+                output.Append($"[{BitConverter.ToString(r.Skip(1).ToArray())} \"{ascii}\"] ");
+            }
         }
 
         private byte[]? ReadReport(int timeoutMs)
@@ -284,6 +327,36 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
 
     // ------------------------------------------------------------ diagnostics
 
+    /// <summary>Sends several commands to each candidate interface and prints every raw report (hex + ASCII).</summary>
+    private static void DumpRaw()
+    {
+        Console.WriteLine("  Raw probe of candidate interfaces:");
+        List<string> paths = HidUpsProvider.Native.EnumerateHidPaths(out _);
+        foreach (string path in paths)
+        {
+            Info i = ReadInfo(path);
+            if (i.UsagePage != VendorPage || i.InputLength != ChunkSize + 1 || i.OutputLength != ChunkSize + 1)
+            {
+                continue;
+            }
+
+            Console.WriteLine("  " + path);
+            using Channel? channel = Channel.Open(path, i);
+            if (channel == null)
+            {
+                Console.WriteLine("    cannot open");
+                continue;
+            }
+
+            foreach (string cmd in new[] { "Q1", "QS", "QGS", "QPI", "QMOD", "QVFW", "I", "F", "Q" })
+            {
+                var sb = new StringBuilder();
+                channel.Raw(cmd, sb);
+                Console.WriteLine($"    {cmd,-5} -> {(sb.Length == 0 ? "(nothing)" : sb.ToString().TrimEnd())}");
+            }
+        }
+    }
+
     /// <summary>Probes the Q1 channel and prints the raw reply (run: ups-tray-monitor --dump).</summary>
     public static void Dump()
     {
@@ -302,6 +375,11 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
             return;
         }
 
+        if (channel == null)
+        {
+            DumpRaw();
+        }
+
         using (channel)
         {
             foreach (string line in log)
@@ -313,7 +391,7 @@ public sealed class MegatecHidProvider : IUpsProvider, IDisposable
             {
                 Console.WriteLine("  No candidate interface (vendor page 0xFF00, 8-byte reports, next to a UPS interface).");
             }
-            else if (channel != null && TryParse(channel.Query("Q1") ?? "", out UpsState? s) && s != null)
+            else if (channel != null && TryParse(channel.Query(channel.Command) ?? "", out UpsState? s) && s != null)
             {
                 Console.WriteLine($"  OK: in {s.InputVoltage:0.#} V, load {s.LoadPercent}%, battery {s.BatteryVoltage:0.#} V, status {s.Status}");
             }

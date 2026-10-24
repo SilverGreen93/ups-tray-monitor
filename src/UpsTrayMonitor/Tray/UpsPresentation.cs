@@ -99,11 +99,25 @@ public static class UpsPresentation
 /// <summary>Extension helpers for samples.</summary>
 public static class SampleExtensions
 {
-    /// <summary>Output power as "N W", or "N VA" when only apparent power is known.</summary>
-    public static string? PowerText(this UpsSample sample) =>
-        sample.OutputWatts is double w ? $"{w:0} W"
-        : sample.OutputVa is double va ? $"{va:0} VA"
-        : null;
+    /// <summary>
+    /// Output power, always in watts. Prefers the UPS's reported active power; when only
+    /// apparent power (VA) is available, estimates real watts using a 0.6 power factor
+    /// (typical for desktop/UPS loads), so the value stays comparable.
+    /// </summary>
+    public static string? PowerText(this UpsSample sample)
+    {
+        if (sample.OutputWatts is double w)
+        {
+            return $"{w:0} W";
+        }
+
+        if (sample.OutputVa is double va)
+        {
+            return $"{va * 0.6:0} W";
+        }
+
+        return null;
+    }
 
     public static bool HasData(this UpsSample sample) =>
         sample.Status != UpsStatus.Unknown

@@ -13,7 +13,6 @@ param(
     # Override the version baked into the MSI (default: csproj <Version>).
     [string]$Version
 )
-
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -25,6 +24,10 @@ if (-not $Version) {
     $Version = (dotnet msbuild $csproj -getProperty:Version).Trim()
     if (-not $Version) { throw 'Could not read <Version> from the csproj.' }
 }
+
+# The MSI uses a two-part Major.Minor version (e.g. 1.0), even though the
+# assembly version has three parts (1.0.0).
+$Version = ($Version -split '\.')[0..1] -join '.'
 
 Write-Output "Publishing framework-dependent build (v$Version)..."
 dotnet publish $csproj -c Release -r win-x64 --self-contained false -o $publishDir --nologo -v q

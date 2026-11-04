@@ -230,28 +230,11 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
             any = true;
         }
 
+        // Measured power only. The UPS's rated power is reported as-is in
+        // RatedWatts/RatedVa; the load % x rated estimate happens in the UI
+        // (UpsPresentation), where the user's manual max-power override applies.
         double? watts = Find(Usages.PowerPage, Usages.ActivePower)?.Value;
-        if (watts is null or 0 && load != null)
-        {
-            // Many units (CyberPower) only report the rated power and the load %.
-            var rated = Find(Usages.PowerPage, Usages.ConfigActivePower);
-            if (rated != null && rated.Value > 0)
-            {
-                watts = rated.Value * load.Value / 100.0;
-            }
-        }
-
-        // No real watts available: deduce the apparent power (VA) instead.
-        double? va = null;
-        if (watts is null or 0)
-        {
-            va = Find(Usages.PowerPage, Usages.ApparentPower)?.Value;
-            var ratedVa = Find(Usages.PowerPage, Usages.ConfigApparentPower);
-            if (va is null or 0 && load != null && ratedVa != null && ratedVa.Value > 0)
-            {
-                va = ratedVa.Value * load.Value / 100.0;
-            }
-        }
+        double? va = watts is null or 0 ? Find(Usages.PowerPage, Usages.ApparentPower)?.Value : null;
 
         if (watts is > 0 || (watts != null && va is not > 0))
         {
@@ -261,6 +244,13 @@ public sealed class HidUpsProvider : IUpsProvider, IDisposable
         else if (va != null)
         {
             state.OutputVa = va;
+            any = true;
+        }
+
+        state.RatedWatts = Find(Usages.PowerPage, Usages.ConfigActivePower)?.Value;
+        state.RatedVa = Find(Usages.PowerPage, Usages.ConfigApparentPower)?.Value;
+        if (state.RatedWatts is > 0 || state.RatedVa is > 0)
+        {
             any = true;
         }
 

@@ -26,7 +26,9 @@ public sealed class DetailsForm : Form
     private readonly Label _runtimeValue;
     private readonly Label _footerSource;
     private readonly Label _footerTime;
+    private readonly ToolTip _toolTip = new();
 
+    private UpsSample? _lastSample;
     private bool _isOpen;
 
     /// <summary>True while the popup is actually on screen (i.e. <see cref="Form.Visible"/> is true).</summary>
@@ -153,6 +155,14 @@ public sealed class DetailsForm : Form
         _powerValue = AddRow(TopBar + 236, "Power");
         _runtimeValue = AddRow(TopBar + 270, "Runtime");
 
+        // Double-clicking the Power value lets the user set a maximum power, used to
+        // estimate Power (max x load%) when the UPS reports neither watts nor VA.
+        _toolTip.AutoPopDelay = 10_000;
+        _toolTip.SetToolTip(_powerValue,
+            "Double-click to set the UPS maximum power (W).\nEstimates Power from load % when the UPS reports no measured power.");
+        _powerValue.Cursor = Cursors.Hand;
+        _powerValue.DoubleClick += (_, _) => PromptMaxPower();
+
         AddDivider(TopBar + 302);
 
         _footerSource = new Label
@@ -188,6 +198,7 @@ public sealed class DetailsForm : Form
 
     public void Update(UpsSample? sample)
     {
+        _lastSample = sample;
         bool hasData = sample != null && sample.HasData();
         Color color = UpsPresentation.StatusColor(sample);
 
@@ -214,6 +225,10 @@ public sealed class DetailsForm : Form
         _batteryVoltValue.Text = sample?.BatteryVoltage is double bv ? $"{bv:0.#} V" : "—";
         _loadValue.Text = sample?.LoadPercent is int load ? $"{load}%" : "—";
         _powerValue.Text = sample?.PowerText() ?? "—";
+        // Orange while the Power value comes from the user's manual max-power override.
+        _powerValue.ForeColor = sample != null && sample.PowerUsesOverride()
+            ? UpsPresentation.PowerOverride
+            : UpsPresentation.TextPrimary;
         _runtimeValue.Text = sample?.RuntimeMinutes is int minutes ? $"~{minutes} min" : "—";
 
         _footerSource.Text = "Source: " + (sample?.Provider ?? "none");
@@ -238,6 +253,54 @@ public sealed class DetailsForm : Form
     // the user explicitly closes it (tray-icon click or the X button). This avoids the
     // WinForms race where clicking the tray icon deactivates the popup *before* the
     // MouseClick event fires, which made single-click toggle impossible.
+
+    /// <summary>Double-click on the Power value: ask for a maximum power override and persist it.</summary>
+    private void PromptMaxPower()
+    {
+        // Prefer what the UPS declares as its rated power; fall back to its
+        // measured values. (Power itself may show a load % estimate - not useful here.)
+        UpsSample? s = _lastSample;
+        string reported =
+            s?.RatedWatts is double rw && rw > 0 ? $"{rw:0} W"
+            : s?.RatedVa is double rva && rva > 0 ? $"{rva:0} VA (apparent)"
+            : s?.OutputWatts is double ow && ow > 0 ? $"{ow:0} W (measured)"
+            : s?.OutputVa is double ov && ov > 0 ? $"{ov:0} VA (measured, apparent)"
+            : "none - this UPS reports no rated power";
+
+        int current = AppSettings.Current.MaxPowerWatts;
+        string overrideLine = current > 0 ? $"\nManual override in effect: {current} W" : "";
+
+        var location = new Point(Left + (Width - 360) / 2, Top + 70);
+        using var dialog = new InputDialog(
+            "UPS maximum power",
+            "UPS reported power: " + reported + overrideLine + "\n\n" +
+            "Enter the UPS maximum power in watts to estimate Power as max x load%.\n" +
+            "Reset clears the override and uses only the value reported by the UPS.",
+            current,
+            AppSettings.MaxPowerLimitWatts,
+            location);
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        AppSettings.Current.MaxPowerWatts = dialog.Number;
+        AppSettings.Current.Save();
+
+        // Re-render right away; the new override is picked up by PowerText().
+        Update(_lastSample);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _toolTip.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
 
     protected override void OnVisibleChanged(EventArgs e)
     {

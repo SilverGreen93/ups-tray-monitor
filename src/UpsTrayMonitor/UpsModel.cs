@@ -32,6 +32,12 @@ public sealed record UpsState
     /// <summary>Output apparent power in VA, only set when the UPS gives no real watts.</summary>
     public double? OutputVa { get; set; }
 
+    /// <summary>Rated/maximum active power in watts declared by the UPS, if any.</summary>
+    public double? RatedWatts { get; set; }
+
+    /// <summary>Rated/maximum apparent power in VA declared by the UPS, if any.</summary>
+    public double? RatedVa { get; set; }
+
     /// <summary>Estimated remaining runtime in minutes, if reported.</summary>
     public int? RuntimeMinutes { get; set; }
 
@@ -54,6 +60,8 @@ public sealed record UpsSample
     public int? LoadPercent { get; init; }
     public double? OutputWatts { get; init; }
     public double? OutputVa { get; init; }
+    public double? RatedWatts { get; init; }
+    public double? RatedVa { get; init; }
     public int? RuntimeMinutes { get; init; }
     public double? BatteryVoltage { get; init; }
     public string? Model { get; init; }

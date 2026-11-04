@@ -16,6 +16,9 @@ public static class UpsPresentation
     public static readonly Color Critical = Color.FromArgb(0xE5, 0x48, 0x4D); // red
     public static readonly Color Unknown = Color.FromArgb(0x7D, 0x87, 0x99); // gray
 
+    /// <summary>Power value color while the user's manual max-power override is in use.</summary>
+    public static readonly Color PowerOverride = Color.FromArgb(0xFF, 0x9F, 0x43); // orange
+
     public static string StatusText(UpsSample? sample)
     {
         if (sample == null)
@@ -100,24 +103,47 @@ public static class UpsPresentation
 public static class SampleExtensions
 {
     /// <summary>
-    /// Output power, always in watts. Prefers the UPS's reported active power; when only
-    /// apparent power (VA) is available, estimates real watts using a 0.6 power factor
-    /// (typical for desktop/UPS loads), so the value stays comparable.
+    /// Output power, always in watts, using this precedence:
+    /// UPS-measured active power; then load % x rated power, where the user's
+    /// manually set maximum power (popup: double-click the Power value) replaces
+    /// the UPS's rated value; then measured apparent power (VA) converted at a
+    /// 0.6 power factor (typical for desktop/UPS loads); then load % x rated VA
+    /// with the same conversion.
     /// </summary>
     public static string? PowerText(this UpsSample sample)
     {
-        if (sample.OutputWatts is double w)
+        if (sample.OutputWatts is > 0)
         {
-            return $"{w:0} W";
+            return $"{sample.OutputWatts:0} W";
         }
 
-        if (sample.OutputVa is double va)
+        if (EffectiveRatedWatts(sample) is > 0 and double rated && sample.LoadPercent is int load)
         {
-            return $"{va * 0.6:0} W";
+            return $"{rated * load / 100.0:0} W";
         }
 
-        return null;
+        if (sample.OutputVa is > 0)
+        {
+            return $"{sample.OutputVa * 0.6:0} W";
+        }
+
+        if (sample.RatedVa is > 0 && sample.LoadPercent is int loadVa)
+        {
+            return $"{sample.RatedVa * 0.6 * loadVa / 100.0:0} W";
+        }
+
+        return sample.OutputWatts is null ? null : $"{sample.OutputWatts:0} W";
     }
+
+    /// <summary>True while the displayed Power is derived from the user's manual max-power override.</summary>
+    public static bool PowerUsesOverride(this UpsSample sample) =>
+        AppSettings.Current.MaxPowerWatts > 0
+        && sample.OutputWatts is not > 0
+        && sample.LoadPercent != null;
+
+    /// <summary>The rated (maximum) watts used for the load % estimate; the user's override replaces the UPS value.</summary>
+    private static double? EffectiveRatedWatts(UpsSample sample) =>
+        AppSettings.Current.MaxPowerWatts > 0 ? AppSettings.Current.MaxPowerWatts : sample.RatedWatts;
 
     public static bool HasData(this UpsSample sample) =>
         sample.Status != UpsStatus.Unknown

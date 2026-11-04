@@ -19,6 +19,13 @@ internal sealed class AppSettings
     /// </summary>
     public int MaxPowerWatts { get; set; }
 
+    /// <summary>
+    /// False only on the very first run (no settings file yet). The tray app
+    /// uses that to default "Start at Windows startup" to on; the flag is
+    /// saved right after, so the default applies exactly once.
+    /// </summary>
+    public bool FirstRunCompleted { get; set; }
+
     /// <summary>The settings in effect for this run, loaded once at startup.</summary>
     public static AppSettings Current { get; } = Load();
 
@@ -31,10 +38,19 @@ internal sealed class AppSettings
     {
         try
         {
-            var settings = File.Exists(FilePath)
+            bool exists = File.Exists(FilePath);
+            var settings = exists
                 ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath))
                 : null;
             settings ??= new AppSettings();
+            if (exists)
+            {
+                // Settings from an older version predate FirstRunCompleted; an
+                // existing file means this is not a first run, so first-run
+                // defaults (e.g. auto-start) must not silently re-apply.
+                settings.FirstRunCompleted = true;
+            }
+
             if (settings.MaxPowerWatts is < 0 or > MaxPowerLimitWatts)
             {
                 settings.MaxPowerWatts = 0;

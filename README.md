@@ -96,7 +96,13 @@ guessing.
 
 Tick **Start at Windows startup** in the tray menu. The app writes a value under
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` pointing at the running
-`.exe`; unticking the option removes it. (No admin rights needed.)
+`.exe`; unticking the option removes it. (No admin rights needed.) On the very
+first run - before any settings file exists - the option is on by default.
+
+The menu item always mirrors the real registry state: if you disable the entry
+externally (Task Manager or Settings write a `StartupApproved` marker instead of
+deleting the Run value), the checkbox shows unticked the next time you open the
+tray menu, and ticking it again re-enables the entry for real.
 
 Alternatively, do it manually:
 

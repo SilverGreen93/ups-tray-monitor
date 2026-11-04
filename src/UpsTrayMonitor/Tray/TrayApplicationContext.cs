@@ -39,13 +39,40 @@ public sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add("Show details", null, (_, _) => _detailsForm.HandleTrayIconClick(_lastSample));
         menu.Items.Add("Refresh now", null, (_, _) => _refreshRequested = true);
 
+        bool startupEnabled = StartupManager.IsEnabled();
+        if (!AppSettings.Current.FirstRunCompleted)
+        {
+            // First run (no settings yet): opt in to auto-start unless the user
+            // already registered the app some other way. Whatever happens, the
+            // flag below makes this a once-only default.
+            if (!startupEnabled)
+            {
+                try
+                {
+                    StartupManager.SetEnabled(true);
+                    startupEnabled = true;
+                }
+                catch
+                {
+                    // Registry not writable - leave the option off.
+                }
+            }
+
+            AppSettings.Current.FirstRunCompleted = true;
+            AppSettings.Current.Save();
+        }
+
         var startupItem = new ToolStripMenuItem("Start at Windows startup")
         {
-            Checked = StartupManager.IsEnabled(),
+            Checked = startupEnabled,
             CheckOnClick = true,
         };
         startupItem.Click += (_, _) => ToggleStartup(startupItem);
         menu.Items.Add(startupItem);
+
+        // Re-read the registry every time the menu opens so changes made
+        // outside the app (Task Manager, Settings) are reflected.
+        menu.Opening += (_, _) => startupItem.Checked = StartupManager.IsEnabled();
 
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApplication());

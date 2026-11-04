@@ -6,6 +6,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>UpSTrayMonitor</RootNamespace>
     <AssemblyName>ups-tray-monitor</AssemblyName>
+    <ApplicationIcon>..\..\assets\powercfg.cpl_I00ca_0409.ico</ApplicationIcon>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>

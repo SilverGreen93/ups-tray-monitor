@@ -26,8 +26,9 @@ if (-not $Version) {
 }
 
 # The MSI uses a two-part Major.Minor version (e.g. 1.0), even though the
-# assembly version has three parts (1.0.0).
-$Version = ($Version -split '\.')[0..1] -join '.'
+# assembly version has three parts (1.0.0). A leading 'v' (release tags) is
+# accepted and dropped.
+$Version = ($Version.TrimStart('v') -split '\.')[0..1] -join '.'
 
 Write-Output "Publishing framework-dependent build (v$Version)..."
 dotnet publish $csproj -c Release -r win-x64 --self-contained false -o $publishDir --nologo -v q

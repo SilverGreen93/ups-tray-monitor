@@ -1,0 +1,51 @@
+name: Release
+
+# Push a tag like v1.0 to build the app and publish a GitHub release
+# containing the MSI installer and the installer-free app zip.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install WiX v5
+        run: dotnet tool install --global wix --version 5.0.2
+
+      - name: Build MSI installer
+        # The tag (minus the leading v) is the MSI version; build.ps1 trims
+        # it to Major.Minor.
+        run: pwsh installer/build.ps1 -Version "${{ github.ref_name }}".TrimStart('v')
+
+      - name: Package installer-free app zip
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Compress-Archive -Path installer/publish/* -DestinationPath "dist/ups-tray-monitor-$version-win-x64.zip"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release create $tag --verify-tag --generate-notes `
+            --title "UPS Tray Monitor $($tag.TrimStart('v'))" `
+            installer/dist/*.msi `
+            dist/ups-tray-monitor-*.zip

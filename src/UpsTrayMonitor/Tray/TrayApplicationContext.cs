@@ -38,6 +38,15 @@ public sealed class TrayApplicationContext : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add("Show details", null, (_, _) => _detailsForm.HandleTrayIconClick(_lastSample));
         menu.Items.Add("Refresh now", null, (_, _) => _refreshRequested = true);
+
+        var startupItem = new ToolStripMenuItem("Start at Windows startup")
+        {
+            Checked = StartupManager.IsEnabled(),
+            CheckOnClick = true,
+        };
+        startupItem.Click += (_, _) => ToggleStartup(startupItem);
+        menu.Items.Add(startupItem);
+
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApplication());
         _notifyIcon.ContextMenuStrip = menu;
@@ -153,6 +162,23 @@ public sealed class TrayApplicationContext : ApplicationContext
             {
                 _detailsForm.Update(sample);
             }
+        }
+    }
+
+    /// <summary>
+    /// Applies the "Start at Windows startup" tick to the registry. CheckOnClick
+    /// has already flipped the tick before this runs, so on failure we flip it back.
+    /// </summary>
+    private void ToggleStartup(ToolStripMenuItem item)
+    {
+        bool wanted = item.Checked;
+        try
+        {
+            StartupManager.SetEnabled(wanted);
+        }
+        catch
+        {
+            item.Checked = !wanted;
         }
     }
 

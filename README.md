@@ -29,7 +29,8 @@ required.
   power and runtime (Windows tooltip limit: 128 characters).
 - **Left-click** the tray icon → popup window with the same information in
   detail (battery bar, model, data source, last update time).
-- **Right-click** → menu with *Show details*, *Refresh now*, *Exit*.
+- **Right-click** → menu with *Show details*, *Refresh now*, *Start at Windows
+  startup* and *Exit*.
 - Polls the UPS every 5 seconds in the background; single instance.
 
 ## Requirements
@@ -96,6 +97,12 @@ guessing.
 
 ## Start at login (optional)
 
+Tick **Start at Windows startup** in the tray menu. The app writes a value under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` pointing at the running
+`.exe`; unticking the option removes it. (No admin rights needed.)
+
+Alternatively, do it manually:
+
 1. Press `Win+R`, type `shell:startup`, press Enter.
 2. Drop a shortcut to `ups-tray-monitor.exe` (or a `dotnet.exe` shortcut with
    `exec <path>\ups-tray-monitor.dll`) into that folder.
@@ -114,6 +121,7 @@ src\UpSTrayMonitor\
 │   └── SystemPowerProvider.cs     GetSystemPowerStatus fallback
 └── Tray\
     ├── TrayApplicationContext.cs  NotifyIcon, polling loop, context menu
+    ├── StartupManager.cs          "Start at Windows startup" registry toggle
     ├── DetailsForm.cs             Popup window shown on left-click
     ├── StatusIcon.cs              Runtime-drawn tray icon (battery glyph)
     └── UpsPresentation.cs         Shared colors, status text, tooltip builder

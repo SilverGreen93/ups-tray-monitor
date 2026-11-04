@@ -6,6 +6,11 @@ required.
 
 ![screenshot](assets/screenshot.png?raw=true)
 
+## UPS Compatibility
+
+The following UPS models are confirmed working:  [nJoy Cadu series](https://www.njoy.global/products/seria-cadu/overview), [nJoy Keen series](https://www.njoy.global/products/seria-keen/overview).
+
+
 ## Features
 
 - **Tray icon** (drawn at runtime, no `.ico` file) whose color reflects the state:

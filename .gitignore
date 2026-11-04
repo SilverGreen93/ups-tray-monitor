@@ -1,5 +1,9 @@
 bin/
 obj/
+publish-sc/
+publish-fd/
+installer/publish/
+installer/dist/
 *.user
 .vs/
 .vscode/

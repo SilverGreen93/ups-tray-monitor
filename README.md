@@ -43,6 +43,23 @@ The following UPS models are confirmed working:  [nJoy Cadu series](https://www.
 dotnet build
 ```
 
+## Installer (MSI)
+
+```powershell
+pwsh installer\build.ps1
+```
+
+Requires the [WiX Toolset v5](https://wixtoolset.org/) CLI (`wix`) on the PATH
+(`dotnet tool install -g wix`). The script reads the version from the project
+file, publishes a framework-dependent x64 build and produces a single small
+MSI in `installer\dist\ups-tray-monitor-<version>.msi`.
+
+The installer is **per-user**: it installs into `%LOCALAPPDATA%\Programs\UPS
+Tray Monitor`, adds a Start Menu shortcut, needs no admin rights, and registers
+in the current user's *Apps & features*. It requires the **.NET 8 Desktop
+Runtime (x64) or newer**; if that is missing the install stops with a clear
+message and a download link.
+
 ## Run
 
 ```powershell

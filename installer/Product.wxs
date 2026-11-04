@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  UPS Tray Monitor - per-user MSI installer (WiX v5).
+
+  Builds to a single small MSI containing the framework-dependent publish
+  output. Requires the .NET 8 Desktop Runtime (x64) or newer; install is
+  blocked with a clear message when it is missing.
+
+  Build with installer\build.ps1, or manually:
+
+    wix build installer\Product.wxs -d Version=1.0.0 -o ups-tray-monitor-1.0.0.msi
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <?ifndef Version?><?define Version = "1.0.0" ?><?endif?>
+  <?ifndef PublishDir?><?define PublishDir = "publish" ?><?endif?>
+  <?ifndef AssetsDir?><?define AssetsDir = "..\assets" ?><?endif?>
+
+  <Package Name="UPS Tray Monitor"
+           Manufacturer="SilverGreen93"
+           Version="$(var.Version)"
+           UpgradeCode="42F9B385-C574-4EA7-838E-80291C3BFFF3"
+           Language="1033"
+           Scope="perUser"
+           Compressed="yes"
+           InstallerVersion="500">
+
+    <!--
+      "perUser" produces a pure per-user package: ALLUSERS is left unset, so
+      Windows Installer always uses the per-user context - no elevation is
+      ever attempted and the Add/Remove Programs entry registers in HKCU.
+      (A "perUserOrMachine" package with ALLUSERS=2 + MSIINSTALLPERUSER=1 was
+      tried first but still resolved to the per-machine context in practice.)
+    -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon.ico" SourceFile="$(var.AssetsDir)\powercfg.cpl_I00ca_0409.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <!--
+      Launch condition: .NET 8 Desktop Runtime (x64) or newer.
+      Detected from the shared framework files rather than the
+      HKLM\SOFTWARE\dotnet\Setup registry keys, because those keys are only
+      written by the official MSI installers and may be missing when .NET
+      was installed another way. [WindowsVolume] is used instead of
+      [ProgramFiles64Folder] because the latter resolves to %LOCALAPPDATA%
+      in the per-user install context; the physical "Program Files" folder
+      name is the same on all Windows locales.
+    -->
+    <Property Id="DOTNETDESKTOP8">
+      <DirectorySearch Id="SearchDesktopRuntime"
+                       Path="[WindowsVolume]Program Files\dotnet\shared\Microsoft.WindowsDesktop.App"
+                       Depth="2">
+        <FileSearch Name="System.Windows.Forms.dll" MinVersion="8.0.0.0" />
+      </DirectorySearch>
+    </Property>
+
+    <!--
+      WiX v5 has no <Condition>/<LaunchCondition> element; the equivalent is an
+      error custom action scheduled after cost finalize, once the directory
+      search above has populated DOTNETDESKTOP8.
+    -->
+    <CustomAction Id="NoDesktopRuntimeError"
+                  Error="This application requires the .NET 8 Desktop Runtime (x64) or newer. Install it from https://dotnet.microsoft.com/download/dotnet/8.0 and run this installer again." />
+    <InstallExecuteSequence>
+      <Custom Action="NoDesktopRuntimeError" After="CostFinalize" Condition="NOT Installed AND NOT DOTNETDESKTOP8" />
+    </InstallExecuteSequence>
+
+    <!-- Installs under %LOCALAPPDATA%\Programs\UPS Tray Monitor (no admin). -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="LocalProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="UPS Tray Monitor" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Start Menu shortcut (per-user, shown for the installing user). -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationMenuFolder" Name="UPS Tray Monitor" />
+    </StandardDirectory>
+
+    <Feature Id="MainApplication" Title="UPS Tray Monitor" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+      <Component Id="ExeComp">
+        <File Source="$(var.PublishDir)\ups-tray-monitor.exe" />
+      </Component>
+      <Component Id="MainDllComp">
+        <File Source="$(var.PublishDir)\ups-tray-monitor.dll" />
+      </Component>
+      <Component Id="DepsJsonComp">
+        <File Source="$(var.PublishDir)\ups-tray-monitor.deps.json" />
+      </Component>
+      <Component Id="RuntimeConfigComp">
+        <File Source="$(var.PublishDir)\ups-tray-monitor.runtimeconfig.json" />
+      </Component>
+      <Component Id="SystemManagementComp">
+        <File Source="$(var.PublishDir)\System.Management.dll" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="StartMenuShortcut" Directory="ApplicationMenuFolder">
+      <RegistryValue Root="HKCU"
+                     Key="Software\UPS Tray Monitor"
+                     Name="StartMenuShortcut"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+      <Shortcut Id="ApplicationShortcut"
+                Name="UPS Tray Monitor"
+                Description="Windows system tray monitor for USB UPS status"
+                Target="[INSTALLFOLDER]ups-tray-monitor.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveApplicationMenuFolder" On="uninstall" />
+    </Component>
+  </Fragment>
+
+</Wix>

@@ -4,22 +4,7 @@ A small Windows system-tray application that shows the status of a USB-connected
 UPS: battery level, input voltage, output load and power. No vendor software
 required.
 
-```
-┌─────────────────────────────┐
-│ UPS Monitor        [On line]│
-│ Test UPS 1500VA             │
-│ ─────────────────────────── │
-│ Status             On line  │
-│ Battery level          87%  │
-│ ████████████████████░░░     │
-│ Input voltage        231,4 V│
-│ Output load             23% │
-│ Power                 184 W │
-│ Runtime             ~142 min│
-│ ─────────────────────────── │
-│ Source: HID   Updated 12:34 │
-└─────────────────────────────┘
-```
+![screenshot](assets/screenshot.png?raw=true)
 
 ## Features
 

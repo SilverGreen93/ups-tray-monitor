@@ -19,6 +19,8 @@ public static class UpsPresentation
     /// <summary>Power value color while the user's manual max-power override is in use.</summary>
     public static readonly Color PowerOverride = Color.FromArgb(0xFF, 0x9F, 0x43); // orange
 
+    public static readonly Color Link = Color.FromArgb(0x6C, 0xB6, 0xFF); // light blue, for link labels
+
     public static string StatusText(UpsSample? sample)
     {
         if (sample == null)

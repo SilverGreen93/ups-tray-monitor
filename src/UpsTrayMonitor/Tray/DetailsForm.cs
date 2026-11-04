@@ -11,6 +11,8 @@ namespace UpSTrayMonitor.Tray;
 /// </summary>
 public sealed class DetailsForm : Form
 {
+    private const string GitHubUrl = "https://github.com/SilverGreen93/ups-tray-monitor";
+
     private const int FormWidth = 340;
     private const int TopBar = 28; // strip above the title row holding the close button
     private const int FormHeight = 336 + TopBar;
@@ -98,10 +100,12 @@ public sealed class DetailsForm : Form
         };
         Controls.Add(closeButton);
 
-        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+        // Show only Major.Minor (e.g. v1.0), not the full assembly version (1.0.0.0).
+        Version? version = Assembly.GetExecutingAssembly().GetName().Version;
+        string versionText = version is null ? "" : $"v{version.Major}.{version.Minor}";
         var titleLabel = new Label
         {
-            Text = string.IsNullOrEmpty(version) ? "UPS Tray Monitor" : $"UPS Tray Monitor v{version}",
+            Text = string.IsNullOrEmpty(versionText) ? "UPS Tray Monitor" : $"UPS Tray Monitor {versionText}",
             Font = new Font("Segoe UI", 9.5f),
             ForeColor = UpsPresentation.TextSecondary,
             AutoSize = true,
@@ -184,6 +188,26 @@ public sealed class DetailsForm : Form
         };
         _footerTime.Location = new Point(FormWidth - 20 - _footerTime.PreferredWidth, TopBar + 312);
         Controls.Add(_footerTime);
+
+        var gitHubLink = new LinkLabel
+        {
+            Text = "GitHub",
+            Font = new Font("Segoe UI", 8.5f),
+            LinkColor = UpsPresentation.Link,
+            ActiveLinkColor = UpsPresentation.TextPrimary,
+            VisitedLinkColor = UpsPresentation.Link,
+            AutoSize = true,
+            TabStop = false,
+        };
+        gitHubLink.Location = new Point((FormWidth - gitHubLink.PreferredWidth) / 2, TopBar + 312);
+        gitHubLink.LinkClicked += (_, _) =>
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(GitHubUrl)
+            {
+                UseShellExecute = true,
+            });
+        };
+        Controls.Add(gitHubLink);
     }
 
     /// <summary>Positions the popup near the bottom-right of the work area (near the tray) and shows it.</summary>

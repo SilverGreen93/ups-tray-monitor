@@ -29,6 +29,11 @@ jobs:
       - name: Install WiX v5
         run: dotnet tool install --global wix --version 5.0.2
 
+      - name: Add WiX UI extension
+        # The wix CLI ships without extensions; the standard setup dialogs
+        # come from WixToolset.UI.wixext and must be registered explicitly.
+        run: wix extension add -g WixToolset.UI.wixext/5.0.2
+
       - name: Build MSI installer
         # The tag (minus the leading v) is the MSI version; build.ps1 trims
         # it to Major.Minor.

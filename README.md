@@ -53,9 +53,10 @@ pwsh installer\build.ps1
 ```
 
 Requires the [WiX Toolset v5](https://wixtoolset.org/) CLI (`wix`) on the PATH
-(`dotnet tool install -g wix`). The script reads the version from the project
-file, publishes a framework-dependent x64 build and produces a single small
-MSI in `installer\dist\ups-tray-monitor-<version>.msi`.
+(`dotnet tool install -g wix`) plus its UI extension for the setup dialogs
+(`wix extension add -g WixToolset.UI.wixext`). The script reads the version
+from the project file, publishes a framework-dependent x64 build and produces
+a single small MSI in `installer\dist\ups-tray-monitor-<version>.msi`.
 
 The installer is **per-user**: it installs into `%LOCALAPPDATA%\Programs\UPS
 Tray Monitor`, adds a Start Menu shortcut, needs no admin rights, and registers

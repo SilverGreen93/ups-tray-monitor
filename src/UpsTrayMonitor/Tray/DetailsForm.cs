@@ -102,7 +102,7 @@ public sealed class DetailsForm : Form
 
         // Show only Major.Minor (e.g. v1.0), not the full assembly version (1.0.0.0).
         Version? version = Assembly.GetExecutingAssembly().GetName().Version;
-        string versionText = version is null ? "" : $"v{version.Major}.{version.Minor}";
+        string versionText = version is null ? "" : $"{version.Major}.{version.Minor}";
         var titleLabel = new Label
         {
             Text = string.IsNullOrEmpty(versionText) ? "UPS Tray Monitor" : $"UPS Tray Monitor {versionText}",

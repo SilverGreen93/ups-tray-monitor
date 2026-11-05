@@ -63,6 +63,11 @@ in the current user's *Apps & features*. It requires the **.NET 8 Desktop
 Runtime (x64) or newer**; if that is missing the install stops with a clear
 message and a download link.
 
+It shows a simple Next → Install → Finish wizard, starts the app automatically
+when the install finishes, and running it again automatically upgrades an
+existing installation (even the same version; rerunning the exact same file
+offers Repair/Remove instead).
+
 ## Run
 
 ```powershell

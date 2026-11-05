@@ -32,8 +32,12 @@
       (A "perUserOrMachine" package with ALLUSERS=2 + MSIINSTALLPERUSER=1 was
       tried first but still resolved to the per-machine context in practice.)
     -->
-    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
+
+    <!-- Setup wizard: Welcome -> Verify Ready -> progress -> Finish. -->
+    <UIRef Id="InstallWizard" />
 
     <Icon Id="AppIcon.ico" SourceFile="$(var.AssetsDir)\powercfg.cpl_I00ca_0409.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
@@ -66,7 +70,20 @@
                   Error="This application requires the .NET 8 Desktop Runtime (x64) or newer. Install it from https://dotnet.microsoft.com/download/dotnet/8.0 and run this installer again." />
     <InstallExecuteSequence>
       <Custom Action="NoDesktopRuntimeError" After="CostFinalize" Condition="NOT Installed AND NOT DOTNETDESKTOP8" />
+      <!-- Start the app when the install/upgrade/repair finishes. NOT REMOVE
+           keeps this from firing on uninstalls (Installed is true during an
+           upgrade transaction, so it cannot be used here). -->
+      <Custom Action="LaunchApp" After="InstallFinalize" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
+
+    <!--
+      Launch the app once the files are installed (async, the installer does
+      not wait). Runs in the user's context for these per-user installs.
+    -->
+    <CustomAction Id="LaunchApp"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="[INSTALLFOLDER]ups-tray-monitor.exe"
+                  Return="asyncNoWait" />
 
     <!-- Installs under %LOCALAPPDATA%\Programs\UPS Tray Monitor (no admin). -->
     <StandardDirectory Id="LocalAppDataFolder">
@@ -122,6 +139,49 @@
                 WorkingDirectory="INSTALLFOLDER" />
       <RemoveFolder Id="RemoveApplicationMenuFolder" On="uninstall" />
     </Component>
+  </Fragment>
+
+  <!--
+    Standard WiX dialogs forming a simple wizard for the per-user install:
+    Welcome -> Verify Ready (Install) -> progress -> Finish. Repair/Remove
+    from Programs and Features uses the maintenance dialogs. The standard
+    sequence shows ProgressDlg, the Verify Ready and Finish dialogs.
+  -->
+  <Fragment>
+    <UI Id="InstallWizard">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="9" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="10" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="VerifyReadyDlg" />
+      <DialogRef Id="ExitDialog" />
+      <DialogRef Id="MaintenanceWelcomeDlg" />
+      <DialogRef Id="MaintenanceTypeDlg" />
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+    </UI>
+
+    <UIRef Id="WixUI_Common" />
   </Fragment>
 
 </Wix>

@@ -39,6 +39,7 @@ $msi = Join-Path $distDir "ups-tray-monitor-$Version.msi"
 
 Write-Output "Building $msi ..."
 wix build (Join-Path $PSScriptRoot 'Product.wxs') `
+    -ext WixToolset.UI.wixext `
     -d "Version=$Version" `
     -d "PublishDir=$publishDir" `
     -d "AssetsDir=$(Join-Path $root 'assets')" `

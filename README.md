@@ -1,5 +1,7 @@
 # UPS Tray Monitor
 
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/SilverGreen93/ups-tray-monitor)](https://github.com/SilverGreen93/ups-tray-monitor/releases/latest) [![Downloads (Latest Release)](https://img.shields.io/github/downloads/SilverGreen93/ups-tray-monitor/latest/total?label=latest%20release%20downloads)](https://github.com/SilverGreen93/ups-tray-monitor/releases/latest) ![GitHub all releases](https://img.shields.io/github/downloads/SilverGreen93/ups-tray-monitor/total?label=total%20downloads)
+
 A small Windows system-tray application that shows the status of a USB-connected
 UPS: battery level, input voltage, output load and power. No vendor software
 required.
@@ -8,8 +10,9 @@ required.
 
 ## UPS Compatibility
 
-The following UPS models are confirmed working:  [nJoy Cadu series](https://www.njoy.global/products/seria-cadu/overview), [nJoy Keen series](https://www.njoy.global/products/seria-keen/overview).
+The following UPS models are confirmed working: [nJoy Cadu series](https://www.njoy.global/products/seria-cadu/overview), [nJoy Keen series](https://www.njoy.global/products/seria-keen/overview).
 
+More UPS models and brands should be compatible, even though they are not tested. If you want to contribute, please open an Issue, with the make, model and the output of `ups-tray-monitor --dump` and specify if it works or there are any issues.
 
 ## Features
 

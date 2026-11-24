@@ -75,6 +75,11 @@ public sealed class TrayApplicationContext : ApplicationContext
         menu.Opening += (_, _) => startupItem.Checked = StartupManager.IsEnabled();
 
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("About", null, (_, _) =>
+        {
+            using var aboutForm = new AboutForm();
+            aboutForm.ShowDialog();
+        });
         menu.Items.Add("Exit", null, (_, _) => ExitApplication());
         _notifyIcon.ContextMenuStrip = menu;
 
